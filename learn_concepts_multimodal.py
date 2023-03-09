@@ -6,7 +6,11 @@ import clip
 import argparse
 import numpy as np
 from tqdm import tqdm
+from transformers import AutoTokenizer, AutoModel
 
+
+MODEL = f"vinai/bertweet-base"
+tokenizer = AutoTokenizer.from_pretrained(MODEL, use_fast=False)
 
 def config():
     parser = argparse.ArgumentParser()
@@ -119,8 +123,13 @@ def learn_conceptbank(args, concept_list, scenario):
     concept_dict = {}
     for concept in tqdm(concept_list):
         # Note: You can try other forms of prompting, e.g. "photo of {concept}" etc. here.
-        text = clip.tokenize(f"{concept}").to("cuda")
-        text_features = model.encode_text(text).cpu().numpy()
+        encoded_input = tokenizer(f"{concept}", return_tensors='pt')
+        model = AutoModel.from_pretrained(MODEL)
+        output = model(**encoded_input)
+        mean_embeds = torch.mean(output.last_hidden_state, dim=1)
+        text_features = mean_embeds.detach().numpy()
+        # text = clip.tokenize(f"{concept}").to(args.device)
+        # text_features = model.encode_text(text).cpu().numpy()
         text_features = text_features/np.linalg.norm(text_features)
         # store concept vectors in a dictionary. Adding the additional terms to be consistent with the
         # `ConceptBank` class (see `concepts/concept_utils.py`).
@@ -172,5 +181,37 @@ if __name__ == "__main__":
             all_concepts = list(set(all_concepts).difference(set(all_classes)))
         learn_conceptbank(args, all_concepts, args.classes)
 
+    elif args.classes == "hateful_memes":
+        all_concepts = ["racist", "hate speech", "vulgar", "harmless", "religious", "sexist", "violence"]
+        learn_conceptbank(args, all_concepts, args.classes)
+    elif args.classes == "toxic_comments":
+        all_concepts = ["racist", 
+                        "hate speech", 
+                        "vulgar", 
+                        "harmless", 
+                        "religious", 
+                        "sexist", 
+                        "violence", 
+                        "sexually", 
+                        "explicit", 
+                        "xenophobic", 
+                        "anti-semitic", 
+                        "profane", 
+                        "anti-immigrant", 
+                        "homophobia", 
+                        "transphobia", 
+                        "sexual violence", 
+                        "aggression",
+                        "threat", 
+                        "name-calling", 
+                        "racial slur", 
+                        "insult", 
+                        "personal attack",
+                        "ableist", 
+                        "misogyny", 
+                        "fat-shaming",
+                        "dehumanizing"]
+        # all_concepts = all_concepts[:7]
+        learn_conceptbank(args, all_concepts, args.classes)
     else:
         raise ValueError(f"Unknown classes: {args.classes}. Define your dataset here!")

@@ -32,19 +32,27 @@ def config():
 def run_linear_probe(args, train_data, test_data):
     train_features, train_labels = train_data
     test_features, test_labels = test_data
+    # print('========== TRRAIN ========== ')
+    # print(train_features)
+    # print('========== TEST ========== ')
+    # print(test_features)
     
     # We converged to using SGDClassifier. 
     # It's fine to use other modules here, this seemed like the most pedagogical option.
     # We experimented with torch modules etc., and results are mostly parallel.
     classifier = SGDClassifier(random_state=args.seed, loss="log_loss",
                                alpha=args.lam, l1_ratio=args.alpha, verbose=0,
-                               penalty="elasticnet", max_iter=10000)
+                               penalty="elasticnet", max_iter=500000)
     classifier.fit(train_features, train_labels)
-
+    
     train_predictions = classifier.predict(train_features)
     train_accuracy = np.mean((train_labels == train_predictions).astype(float)) * 100.
     predictions = classifier.predict(test_features)
     test_accuracy = np.mean((test_labels == predictions).astype(float)) * 100.
+    # print('========== TRRAIN ========== ')
+    # print(train_labels, train_predictions)
+    # print('========== TEST ========== ')
+    # print(test_labels, predictions)
 
     # Compute class-level accuracies. Can later be used to understand what classes are lacking some concepts.
     cls_acc = {"train": {}, "test": {}}
@@ -98,15 +106,17 @@ def main(args, concept_bank, backbone, preprocess):
     # Again, a sad hack.. Open to suggestions
     run_info_file = model_path.replace("pcbm", "run_info-pcbm")
     run_info_file = run_info_file.replace(".ckpt", ".pkl")
-    run_info_file = os.path.join(args.out_dir, run_info_file)
-    
-    with open(run_info_file, "wb") as f:
-        pickle.dump(run_info, f)
+    # run_info_file = os.path.join(args.out_dir, run_info_file)
+    try:
+        with open(run_info_file, "wb") as f:
+            pickle.dump(run_info, f)
+    except:
+        print("failed to dump run info to file.")
 
     
     if num_classes > 1:
         # Prints the Top-5 Concept Weigths for each class.
-        print(posthoc_layer.analyze_classifier(k=5))
+        print(posthoc_layer.analyze_classifier(k=7))
 
     print(f"Model saved to : {model_path}")
     print(run_info)

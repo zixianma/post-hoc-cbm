@@ -1,9 +1,10 @@
 import os
+import clip
 import numpy as np
 import torch
 from tqdm import tqdm
 from torch.utils.data import Dataset
-
+from transformers import AutoTokenizer, AutoModel
 
 def unpack_batch(batch):
     if len(batch) == 3:
@@ -17,11 +18,26 @@ def unpack_batch(batch):
 @torch.no_grad()
 def get_projections(args, backbone, posthoc_layer, loader):
     all_projs, all_embs, all_lbls = None, None, None
+    modality = 'text'
     for batch in tqdm(loader):
-        batch_X, batch_Y = unpack_batch(batch)
-        batch_X = batch_X.to(args.device)
+        if args.dataset in ['hateful_memes', 'toxic_comments']:
+            batch_X, batch_Y = batch[modality], batch['label']
+        else:
+            batch_X, batch_Y = unpack_batch(batch)
+            batch_X = batch_X.to(args.device)
         if "clip" in args.backbone_name:
-            embeddings = backbone.encode_image(batch_X).detach().float()
+            if modality == 'text':
+                tokens = clip.tokenize(batch_X, truncate=True).to(args.device)
+                embeddings = backbone.encode_text(tokens).detach().float()
+                # print(embeddings.shape)
+            else:
+                embeddings = backbone.encode_image(batch_X).detach().float()
+        elif "bert" in args.backbone_name:
+            tokenizer = AutoTokenizer.from_pretrained(f'vinai/{args.backbone_name}', use_fast=False)
+            encoded_input = tokenizer(batch_X, return_tensors='pt', padding=True, truncation=True)
+            output = backbone(**encoded_input)
+            # embeddings = output.pooler_output.detach()
+            embeddings = torch.mean(output.last_hidden_state, dim=1)
         else:
             embeddings = backbone(batch_X).detach()
         projs = posthoc_layer.compute_dist(embeddings).detach().cpu().numpy()
@@ -82,11 +98,11 @@ def load_or_compute_projections(args, backbone, posthoc_layer, train_loader, tes
         train_embs, train_projs, train_lbls = get_projections(args, backbone, posthoc_layer, train_loader)
         test_embs, test_projs, test_lbls = get_projections(args, backbone, posthoc_layer, test_loader)
 
-        np.save(train_file, train_embs)
-        np.save(test_file, test_embs)
-        np.save(train_proj_file, train_projs)
-        np.save(test_proj_file, test_projs)
-        np.save(train_lbls_file, train_lbls)
-        np.save(test_lbls_file, test_lbls)
+    np.save(train_file, train_embs)
+    np.save(test_file, test_embs)
+    np.save(train_proj_file, train_projs)
+    np.save(test_proj_file, test_projs)
+    np.save(train_lbls_file, train_lbls)
+    np.save(test_lbls_file, test_lbls)
     
     return train_embs, train_projs, train_lbls, test_embs, test_projs, test_lbls

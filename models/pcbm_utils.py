@@ -17,6 +17,7 @@ class PosthocLinearCBM(nn.Module):
         # Get the concept information from the bank
         self.backbone_name = backbone_name
         self.cavs = concept_bank.vectors
+        # print("CAV:\n", self.cavs)
         self.intercepts = concept_bank.intercepts
         self.norms = concept_bank.norms
         self.names = concept_bank.concept_names.copy()

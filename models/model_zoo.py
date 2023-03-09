@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 from torchvision import transforms
-
+from transformers import AutoTokenizer, AutoModel
 
 class ResNetBottom(nn.Module):
     def __init__(self, original_model):
@@ -56,6 +56,10 @@ def get_model(args, backbone_name="resnet18_cub", full_model=False):
                         transforms.ToTensor(),
                         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                       ])
+    elif backbone_name.find('bert') > -1:
+        MODEL = f'vinai/{args.backbone_name}'
+        backbone = AutoModel.from_pretrained(MODEL)
+        return backbone, None
     else:
         raise ValueError(backbone_name)
 
